@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RippleGuard | Multi-Agent Change-Impact Intelligence Layer</title>
+  <meta name="description" content="Multi-agent change-impact intelligence system powered by FalkorDB graph context and memory layer.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Cytoscape.js for graph visualization -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+  <!-- Cytoscape COSE layout extension -->
+  <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+  <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+  <script src="https://unpkg.com/cytoscape-cose-bilkent/cytoscape-cose-bilkent.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <!-- Header / Top Bar -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo-orb">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10" class="orb-ring-1"/>
+          <circle cx="12" cy="12" r="6" class="orb-ring-2"/>
+          <circle cx="12" cy="12" r="2" class="orb-core"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-title">
+          <span class="gradient-text">RippleGuard</span>
+          <span class="badge version-badge">v1.0 • FalkorDB Agent</span>
+        </div>
+        <div class="brand-tagline">Change-Impact Intelligence & Autonomous Multi-Agent Governance</div>
+      </div>
+    </div>
+
+    <div class="header-status-group">
+      <div id="falkorStatusBadge" class="status-pill">
+        <span class="pulse-dot green"></span>
+        <span class="status-label">FalkorDB:</span>
+        <span id="falkorStatusText" class="status-val">Connecting...</span>
+      </div>
+
+      <div class="status-pill">
+        <span class="status-label">Graph Topology:</span>
+        <span id="graphStatsText" class="status-val font-mono">52 Nodes • 61 Edges</span>
+      </div>
+
+      <button id="btnCypherModal" class="btn btn-secondary btn-sm" title="Open FalkorDB Cypher Console">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="4 17 10 11 4 5"></polyline>
+          <line x1="12" y1="19" x2="20" y2="19"></line>
+        </svg>
+        Cypher Console
+      </button>
+
+      <button id="btnMemoryModal" class="btn btn-secondary btn-sm" title="View Cross-Session Memories in FalkorDB">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+        Graph Memory
+      </button>
+
+      <button id="btnResetGraph" class="btn btn-ghost btn-sm" title="Re-seed Graph">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6"></path>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Scenario & Change Request Control Ribbon -->
+  <section class="control-ribbon">
+    <div class="ribbon-label">
+      <span class="ribbon-icon">⚡</span>
+      <span>Simulate Change Request:</span>
+    </div>
+    
+    <div class="scenario-chips" id="scenarioChipsContainer">
+      <!-- Populated dynamically via JS -->
+    </div>
+
+    <div class="ribbon-actions">
+      <button id="btnToggleCustomPr" class="btn btn-outline btn-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+        Custom Diff
+      </button>
+
+      <button id="btnRunAnalysis" class="btn btn-primary btn-glow">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+        <span>Run Multi-Agent Analysis</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Custom PR Drawer / Form (Collapsible) -->
+  <section id="customPrSection" class="custom-pr-panel hidden">
+    <div class="panel-header">
+      <h3>Custom Change Request Editor</h3>
+      <button id="btnCloseCustomPr" class="btn-icon">×</button>
+    </div>
+    <div class="custom-pr-grid">
+      <div class="form-group">
+        <label>PR Identifier</label>
+        <input type="text" id="customPrId" value="PR-201" class="form-input">
+      </div>
+      <div class="form-group">
+        <label>Change Title</label>
+        <input type="text" id="customPrTitle" value="Patch PaymentGateway cipher suite" class="form-input">
+      </div>
+      <div class="form-group">
+        <label>Target Seed Symbol (Node ID in FalkorDB)</label>
+        <select id="customPrSymbolSelect" class="form-input">
+          <option value="sym:PaymentGateway.verify_jwt_token">PaymentGateway.verify_jwt_token</option>
+          <option value="sym:PaymentGateway.authorize_charge">PaymentGateway.authorize_charge</option>
+          <option value="sym:PaymentGateway.execute_refund">PaymentGateway.execute_refund</option>
+          <option value="sym:OrderWorkflow.process_payment">OrderWorkflow.process_payment</option>
+          <option value="sym:OrderController.checkout_cart">OrderController.checkout_cart</option>
+          <option value="sym:InventoryLocker.acquire_lock">InventoryLocker.acquire_lock</option>
+          <option value="sym:NotificationClient.send_receipt">NotificationClient.send_receipt</option>
+          <option value="col:orders.archived_flag">col:orders.archived_flag (Schema Mutation)</option>
+        </select>
+      </div>
+      <div class="form-group full-width">
+        <label>Git Diff Snippet</label>
+        <textarea id="customPrDiff" rows="3" class="form-input font-mono">@@ -15,4 +15,5 @@ def verify_jwt_token(self, token: str):
++    # Updated token verification logic</textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- Safe Gate Alert Banner (Appears if Gate blocks or holds) -->
+  <div id="safeGateBanner" class="safe-gate-banner hidden">
+    <div class="gate-icon-badge">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+    </div>
+    <div class="gate-details">
+      <div class="gate-title">
+        <span id="gateStatusText">BLOCKED_REQUIRES_DUAL_LEAD_APPROVAL</span>
+        <span class="badge badge-danger">Safe Gate Active</span>
+      </div>
+      <div id="gateReasonText" class="gate-reason">
+        Critical blast radius intersection with Tier-0 revenue flow and historical P1 incident INC-402. Production deployment blocked.
+      </div>
+      <div class="gate-signoffs">
+        <span>Required Reviewers: <strong>Sarah Chen (@payments)</strong>, <strong>Marcus Vance (@checkout)</strong></span>
+      </div>
+    </div>
+    <div class="gate-actions">
+      <button id="btnApproveGate" class="btn btn-success btn-sm">Approve Deployment</button>
+      <button id="btnRejectGate" class="btn btn-danger btn-sm">Reject & Request Fix</button>
+    </div>
+  <!-- Mobile View Switcher (Visible on Mobile & Tablet devices) -->
+  <div class="mobile-view-tabs" id="mobileViewTabs">
+    <button class="mobile-view-btn active" data-view="split">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+        <line x1="12" y1="3" x2="12" y2="21"></line>
+      </svg>
+      Split Feed
+    </button>
+    <button class="mobile-view-btn" data-view="graph">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="6" cy="6" r="3"></circle>
+        <circle cx="18" cy="18" r="3"></circle>
+        <line x1="8.5" y1="7.5" x2="15.5" y2="16.5"></line>
+      </svg>
+      Graph Canvas
+    </button>
+    <button class="mobile-view-btn" data-view="intel">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+      </svg>
+      Intelligence & Risk
+    </button>
+  </div>
+
+  <!-- Main Dual-Pane Workspace -->
+  <main class="main-layout" id="mainLayout">
+
+    <!-- Left Pane: Live FalkorDB Graph Canvas -->
+    <section class="graph-pane">
+      <div class="pane-toolbar">
+        <div class="toolbar-left">
+          <span class="toolbar-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="6" cy="6" r="3"></circle>
+              <circle cx="18" cy="18" r="3"></circle>
+              <circle cx="6" cy="18" r="3"></circle>
+              <line x1="8.5" y1="7.5" x2="15.5" y2="16.5"></line>
+              <line x1="6" y1="9" x2="6" y2="15"></line>
+            </svg>
+            FalkorDB Context Graph Canvas
+          </span>
+          <span id="canvasFilterIndicator" class="filter-indicator">Showing all 52 nodes</span>
+        </div>
+
+        <div class="toolbar-controls">
+          <div class="legend-popover">
+            <span class="legend-dot sym"></span>Symbol
+            <span class="legend-dot srv"></span>Service
+            <span class="legend-dot api"></span>API
+            <span class="legend-dot tbl"></span>Table
+            <span class="legend-dot wf"></span>Workflow
+            <span class="legend-dot inc"></span>Incident
+            <span class="legend-dot adr"></span>ADR
+          </div>
+
+          <button id="btnFitGraph" class="btn btn-ghost btn-xs" title="Fit to Viewport">Fit</button>
+          <button id="btnLayoutCose" class="btn btn-ghost btn-xs" title="Force Directed Layout">Layout</button>
+          <button id="btnResetHighlight" class="btn btn-ghost btn-xs" title="Reset Highlights">Reset</button>
+        </div>
+      </div>
+
+      <!-- Graph Container Canvas -->
+      <div id="cy" class="cytoscape-container"></div>
+
+      <!-- Node Inspector Drawer (Slide-in on node click) -->
+      <div id="nodeInspector" class="node-inspector-drawer hidden">
+        <div class="inspector-header">
+          <div class="inspector-title">
+            <span id="inspectorNodeType" class="badge">CodeSymbol</span>
+            <h4 id="inspectorNodeTitle">PaymentGateway.verify_jwt_token</h4>
+          </div>
+          <button id="btnCloseInspector" class="btn-icon">×</button>
+        </div>
+        <div id="inspectorContent" class="inspector-body">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Pane: Multi-Agent Intelligence, Risk Score & Action Cards -->
+    <section class="intelligence-pane">
+      <!-- Tabs header -->
+      <div class="intel-tabs">
+        <button class="intel-tab active" data-tab="tab-overview">Overview & Risk</button>
+        <button class="intel-tab" data-tab="tab-agents">Agent Trace (<span id="traceStepCount">0</span>)</button>
+        <button class="intel-tab" data-tab="tab-tests">Smart Tests (<span id="selectedTestCount">0</span>)</button>
+        <button class="intel-tab" data-tab="tab-evidence">Explainable Paths</button>
+      </div>
+
+      <!-- Tab 1: Overview & Risk -->
+      <div id="tab-overview" class="tab-content active">
+        <!-- Risk Gauge & Summary Header -->
+        <div class="risk-summary-card">
+          <div class="risk-gauge-container">
+            <div id="riskGauge" class="radial-gauge">
+              <svg viewBox="0 0 100 100">
+                <circle class="gauge-bg" cx="50" cy="50" r="42"></circle>
+                <circle id="gaugeProgress" class="gauge-bar critical" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="0"></circle>
+              </svg>
+              <div class="gauge-center-text">
+                <span id="riskScoreValue" class="gauge-score">100</span>
+                <span id="riskScoreTier" class="gauge-tier critical">CRITICAL</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="risk-meta-details">
+            <h3 id="riskSummaryTitle">Catastrophic Blast Radius Detected</h3>
+            <p id="riskSummaryDesc">Direct topological reach into Tier-0 revenue checkout and prior $320,000 outage root cause.</p>
+            
+            <div class="risk-quick-stats">
+              <div class="q-stat">
+                <span class="q-val" id="statServices">3</span>
+                <span class="q-lbl">Services</span>
+              </div>
+              <div class="q-stat">
+                <span class="q-val" id="statApis">2</span>
+                <span class="q-lbl">APIs</span>
+              </div>
+              <div class="q-stat">
+                <span class="q-val" id="statWorkflows">2</span>
+                <span class="q-lbl">Workflows</span>
+              </div>
+              <div class="q-stat">
+                <span class="q-val text-rose" id="statIncidents">1</span>
+                <span class="q-lbl">Incidents</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4-Factor Risk Breakdown -->
+        <div class="card factor-card">
+          <div class="card-title">Multi-Factor Risk Breakdown</div>
+          <div class="factor-list">
+            <div class="factor-item">
+              <div class="factor-label">
+                <span>Workflow Criticality (Tier-0 / Tier-1)</span>
+                <span id="scoreFactorWorkflow" class="factor-score">30 / 30</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div id="barFactorWorkflow" class="progress-bar-fill rose" style="width: 100%;"></div>
+              </div>
+            </div>
+
+            <div class="factor-item">
+              <div class="factor-label">
+                <span>Historical Incident Linkage (P1/P2)</span>
+                <span id="scoreFactorIncident" class="factor-score">25 / 25</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div id="barFactorIncident" class="progress-bar-fill rose" style="width: 100%;"></div>
+              </div>
+            </div>
+
+            <div class="factor-item">
+              <div class="factor-label">
+                <span>Blast Radius & Dependency Reach</span>
+                <span id="scoreFactorReach" class="factor-score">25 / 25</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div id="barFactorReach" class="progress-bar-fill amber" style="width: 100%;"></div>
+              </div>
+            </div>
+
+            <div class="factor-item">
+              <div class="factor-label">
+                <span>ADR Governance & Data Sensitivity</span>
+                <span id="scoreFactorAdr" class="factor-score">20 / 20</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div id="barFactorAdr" class="progress-bar-fill violet" style="width: 100%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stakeholders & Notification Card -->
+        <div class="card stakeholders-card">
+          <div class="card-title">Graph-Derived Reviewers & Channels</div>
+          <div class="stakeholder-content" id="stakeholderList">
+            <div class="team-badge">
+              <span class="team-name">Payments Core Team</span>
+              <span class="team-channel">#payments-core</span>
+              <span class="team-lead">Lead: Sarah Chen</span>
+            </div>
+            <div class="team-badge">
+              <span class="team-name">Checkout Experience Team</span>
+              <span class="team-channel">#checkout-experience</span>
+              <span class="team-lead">Lead: Marcus Vance</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Agent Reasoning Trace -->
+      <div id="tab-agents" class="tab-content">
+        <div class="timeline-container" id="agentTraceTimeline">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- Tab 3: Smart Tests & Execution -->
+      <div id="tab-tests" class="tab-content">
+        <div class="test-runner-header">
+          <div>
+            <h4>Graph-Selected Targeted Tests</h4>
+            <p id="ciSavingsText" class="text-muted">CI time savings: 0%</p>
+          </div>
+          <button id="btnRerunTests" class="btn btn-primary btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Re-run Selected Tests
+          </button>
+        </div>
+
+        <div id="testItemsList" class="test-items-list">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- Tab 4: Explainable Evidence Paths -->
+      <div id="tab-evidence" class="tab-content">
+        <div class="evidence-header">
+          <h4>Evidence-Backed Impact Paths</h4>
+          <p class="text-muted">Mathematical multi-hop proof showing why this change affects high-risk assets.</p>
+        </div>
+        <div id="explainablePathsList" class="paths-list">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Cypher Query Console Modal -->
+  <div id="cypherModal" class="modal-backdrop hidden">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          FalkorDB openCypher Interactive Console
+        </div>
+        <button id="btnCloseCypherModal" class="btn-icon">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="preset-queries">
+          <span>Presets:</span>
+          <button class="chip-query" data-cypher="MATCH (n:Microservice) RETURN n.name, n.tier, n.tech">Microservices</button>
+          <button class="chip-query" data-cypher="MATCH (w:Workflow) RETURN w.name, w.tier, w.revenue_impact">Workflows</button>
+          <button class="chip-query" data-cypher="MATCH (i:Incident) RETURN i.id, i.loss, i.summary">Past Incidents</button>
+          <button class="chip-query" data-cypher="MATCH (a:ADR) RETURN a.name, a.policy">ADRs</button>
+          <button class="chip-query" data-cypher="MATCH (m:AgentMemory) RETURN m.pr_id, m.agent_role, m.risk_score, m.summary">Agent Memory</button>
+        </div>
+        <textarea id="cypherInput" rows="4" class="form-input font-mono" placeholder="MATCH (s:CodeSymbol)-[:CALLS]->(t) RETURN s.name, t.name LIMIT 10">MATCH (w:Workflow) RETURN w.name, w.tier, w.revenue_rate</textarea>
+        <div class="modal-actions-bar">
+          <button id="btnExecuteCypher" class="btn btn-primary btn-sm">Execute Cypher</button>
+          <span id="cypherExecTime" class="text-muted font-mono">Ready</span>
+        </div>
+        <div id="cypherResultsContainer" class="cypher-results">
+          <table id="cypherResultsTable" class="data-table">
+            <thead><tr id="cypherTableHeaders"></tr></thead>
+            <tbody id="cypherTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Graph Memory Inspector Modal -->
+  <div id="memoryModal" class="modal-backdrop hidden">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+          </svg>
+          FalkorDB Cross-Session Memory Inspector
+        </div>
+        <button id="btnCloseMemoryModal" class="btn-icon">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted">Persistent memories stored in FalkorDB by agents across PR reviews, capturing decisions, risks, and lessons learned.</p>
+        <div id="memoryCardsList" class="memory-cards-container">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
